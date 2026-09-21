@@ -287,7 +287,12 @@ const ANGLE_PHRASE = { 'PROGRESS PHOTOGRAPHY': 'progress photography across cons
   'PUBLIC AFFAIRS': 'public-facing project imagery', 'AERIAL / DRONE': 'authorized aerial photography', 'UNKNOWN': 'project photography' };
 const primeOpts = [...D.primes].sort((a, b) => a.name.localeCompare(b.name));
 $('#gPrime').innerHTML = primeOpts.map(p => `<option>${esc(p.name)}</option>`).join('');
-function refRef(p) { const t = p.title.replace(/,?\s*(Redstone Arsenal|Birmingham|Tuscaloosa|Montgomery|Selma|Anniston)?,?\s*(AL|Alabama)\.?$/i, '').trim(); return (t.length > 70 ? t.slice(0, 67).replace(/\s\S*$/, '') + '…' : t); }
+function refRef(p) {
+  if (p.titleDerived) { const [a, ...rest] = p.title.split(', '); const b = rest.join(', ');
+    const a2 = a.replace(/\s*\((construction management)\)$/i, '').replace(/^New /, 'new ');
+    const head = /^[A-Z]{2,}|^Alabama|^Army|^Birmingham|^Marshall|^National|^Practical|^Academic|^Jefferson/.test(a2) ? a2 : a2.charAt(0).toLowerCase() + a2.slice(1);
+    return b ? `${head} ${/VA|Center|campus|Marshall|Cemetery/i.test(b) ? 'at the' : 'in'} ${b}` : head; }
+  const t = p.title.replace(/,?\s*(Redstone Arsenal|Birmingham|Tuscaloosa|Montgomery|Selma|Anniston)?,?\s*(AL|Alabama)\.?$/i, '').trim(); return (t.length > 70 ? t.slice(0, 67).replace(/\s\S*$/, '') + '…' : t); }
 function installation(site) {
   if (/NASA Marshall/i.test(site)) return 'NASA Marshall';
   if (/Redstone/i.test(site)) return 'Redstone Arsenal';
@@ -307,20 +312,20 @@ function projectChanged() {
   const p = PROJ[$('#gProject').value]; if (!p) return;
   $('#gKind').value = p.kind; $('#gAngle').innerHTML = p.angles.map(a => `<option>${esc(a)}</option>`).join('');
   const inst = installation(p.site);
-  $('#gRef').value = inst ? `the ${inst} project` : refRef(p);
-  $('#gRefHint').textContent = inst ? 'Controlled federal site: the draft names the installation rather than the project title — better for a first email. Edit if you already know the team.' : ''; $('#gLoc').value = /Redstone|NASA|FBI/.test(p.site) ? 'Huntsville' : (p.site.includes('(site unconfirmed') ? p.city : p.site.replace(/ \(.*$/, '').replace(/^Birmingham VA Medical Center$/, 'Birmingham'));
+  $('#gRef').value = p.signal === 'LOW SIGNAL' ? 'federal projects' : inst ? `the ${inst} project` : refRef(p);
+  $('#gRefHint').textContent = inst ? 'Controlled federal site: the draft names the installation rather than the project title — better for a first email. Edit if you already know the team.' : ''; $('#gLoc').value = /Redstone|NASA|FBI/.test(p.site) ? 'Huntsville' : (p.site.includes('(site unconfirmed') ? p.city : p.site.includes(', ') ? p.site.split(', ').pop() : p.site.replace(/ \(.*$/, '').replace(/^Birmingham VA Medical Center$/, 'Birmingham'));
   renderEmail();
 }
 function draft() {
-  const s = prof(), p = PROJ[$('#gProject').value], co = titleCo(p.prime), ref0 = $('#gRef').value.trim(), ref = !ref0 ? 'your current project' : (/^(the|your|a|an)\s/i.test(ref0) ? ref0 : 'the ' + ref0), loc = $('#gLoc').value.trim(), ang = ANGLE_PHRASE[$('#gAngle').value] || 'project photography';
+  const s = prof(), p = PROJ[$('#gProject').value], co0 = titleCo(p.prime), co = co0, cos = /s$/i.test(co0) ? co0 + "'" : co0 + "'s", ref0 = $('#gRef').value.trim(), ref = !ref0 ? 'your current project' : (/^(the|your|a|an|federal)\s/i.test(ref0) ? ref0 : 'the ' + ref0), loc = $('#gLoc').value.trim(), ang = ANGLE_PHRASE[$('#gAngle').value] || 'project photography';
   const hi = $('#gName').value.trim() ? `Hi ${$('#gName').value.trim()},` : 'Hi there,';
   const pf = s.sPortfolio || '[SUMP PORTFOLIO LINK]', sig = [s.sName || 'Sump', s.sEmail || '[Email]', s.sPhone || '[Phone]'].join('\n');
-  const where = loc ? ` in ${loc}` : '';
-  const subj = (ref0 || 'your project') + (loc ? ` (${loc})` : '');
+  const where = loc && !ref.toLowerCase().includes(loc.toLowerCase()) ? ` in ${loc}` : '';
+  const subj = (ref0 ? ref0.charAt(0).toUpperCase() + ref0.slice(1) : 'Your project') + (loc && !(ref0 || '').toLowerCase().includes(loc.toLowerCase()) ? ` (${loc})` : '');
   const type = $('#gType').value;
-  if (type === 'f1') return { subject: `Re: Photography support for ${subj}`, body: `${hi}\n\nFollowing up on my note from last week about photography for ${co}'s work on ${ref}${where}. I know project teams are busy, so I'll keep this short.\n\nIf your team ever brings in a photographer for ${ang}, I'd be glad to help. My work is here:\n${pf}\n\nIs there someone on your team who handles this I should reach out to instead?\n\nThanks,\n${sig}` };
+  if (type === 'f1') return { subject: `Re: Photography support for ${subj}`, body: `${hi}\n\nFollowing up on my note from last week about photography for ${cos} work on ${ref}${where}. I know project teams are busy, so I'll keep this short.\n\nIf your team ever brings in a photographer for ${ang}, I'd be glad to help. My work is here:\n${pf}\n\nIs there someone on your team who handles this I should reach out to instead?\n\nThanks,\n${sig}` };
   if (type === 'f2') return { subject: `Re: Photography support for ${subj}`, body: `${hi}\n\nOne last quick note — I won't keep filling your inbox. If photography support on ${ref} or future ${co} projects is ever useful, you can reach me anytime at the contact details below.\n\nPortfolio: ${pf}\n\nBest of luck with the project,\n${sig}` };
-  return { subject: `Photography support for ${subj}`, body: `${hi}\n\nI'm ${s.sName || 'Sump'}, a photographer based in ${s.sCity || 'Alabama'} specializing in ${s.sSpec}.\n\nI came across ${co}'s work on ${ref}${where} and wanted to reach out because I work with project teams that need professional ${ang}.\n\nI wanted to ask whether your team currently has a photographer documenting the project, or whether photography is handled internally.\n\nPortfolio:\n${pf}\n\nIf photography support is something your team brings in during the project, I'd be glad to introduce myself.\n\nBest,\n${sig}` };
+  return { subject: `Photography support for ${subj}`, body: `${hi}\n\nI'm ${s.sName || 'Sump'}, a photographer based in ${s.sCity || 'Alabama'} specializing in ${s.sSpec}.\n\nI came across ${cos} work on ${ref}${where} and wanted to reach out because I work with project teams that need professional ${ang}.\n\nI wanted to ask whether your team currently has a photographer documenting the project, or whether photography is handled internally.\n\nPortfolio:\n${pf}\n\nIf photography support is something your team brings in during the project, I'd be glad to introduce myself.\n\nBest,\n${sig}` };
 }
 function titleCo(n) { return n.replace(/,?\s*(LLC|L\.L\.C\.|INC\.?|INCORPORATED|CO\.?|CORP\.?|CORPORATION|LLP|\(DE\))\b\.?/gi, '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/\b\w/g, c => c.toUpperCase()).replace(/\bJv\b/g, 'JV').replace(/\bBl\b/, 'BL').replace(/\bCci\b/g, 'CCI').replace(/\bMgi\b/g, 'MGI').replace(/\bDri\b/, 'DRI').replace(/\bAecom\b/, 'AECOM').replace(/\bCms\b/, 'CMS').replace(/\bLbyd\b/, 'LBYD').replace(/\bPpw\b/, 'PPW').replace(/\bOac\b/, 'OAC').replace(/\bGsi\b/, 'GSI').replace(/\bIlsi\b/, 'ILSI').replace(/\bOcs-Ncs\b/, 'OCS-NCS').replace(/\bEmr\b/, 'EMR').replace(/\bC\. J\./, 'C.J.').replace(/ & /g, ' & ').replace(/,$/, ''); }
 function renderEmail() {
